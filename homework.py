@@ -6,22 +6,31 @@
 бега, спортивной ходьбы и плавания.
 """
 
+from dataclasses import dataclass
+from typing import Any
 
+SWM: str = 'SWM'
+RUN: str = 'RUN'
+WLK: str = 'WLK'
+
+# Значения констант - корректная длина списка для каждой тренировки.
+LEN_FOR_SWM: int = 5
+LEN_FOR_RUN: int = 3
+LEN_FOR_WLK: int = 4
+
+NOT_FOUND: str = 'Неизвестная тренировка.'
+BAD_DATA: str = 'Некорректный пакет данных.'
+
+
+@dataclass
 class InfoMessage:
     """Информационное сообщение о тренировке."""
 
-    def __init__(self,
-                 training_type: str,
-                 duration: float,
-                 distance: float,
-                 speed: float,
-                 calories: float) -> None:
-        """Инициализирует атрибуты обработанных данных из класса Training."""
-        self.training_type: str = training_type
-        self.duration: float = duration
-        self.distance: float = distance
-        self.speed: float = speed
-        self.calories: float = calories
+    training_type: str
+    duration: float
+    distance: float
+    speed: float
+    calories: float
 
     def get_message(self):
         """Возвращает информационное сообщение о результатах тренировки."""
@@ -49,6 +58,8 @@ class Training:
         self.action: int = action
         self.duration: float = duration
         self.weight: float = weight
+        self.spent_calories: float = 0.0
+        self.mean_speed_km_h: float = 0.0
 
     def get_distance(self) -> float:
         """Получить дистанцию в км."""
@@ -60,11 +71,11 @@ class Training:
 
     def get_mean_speed(self) -> float:
         """Получить среднюю скорость движения."""
-        mean_speed_km_h: float = self.get_distance() / self.duration
+        self.mean_speed_km_h = self.get_distance() / self.duration
 
-        return mean_speed_km_h
+        return self.mean_speed_km_h
 
-    def get_spent_calories(self) -> float:
+    def get_spent_calories(self) -> Any:
         """Получить количество затраченных калорий."""
         pass
 
@@ -82,12 +93,12 @@ class Training:
 class Running(Training):
     """Тренировка: бег."""
 
-    CALORIES_MEAN_SPEED_MULTIPLIER = 18
-    CALORIES_MEAN_SPEED_SHIFT = 1.79
+    CALORIES_MEAN_SPEED_MULTIPLIER: int = 18
+    CALORIES_MEAN_SPEED_SHIFT: float = 1.79
 
     def get_spent_calories(self) -> float:
         """Расход калорий для бега."""
-        spent_calories = (
+        self.spent_calories = (
             (self.CALORIES_MEAN_SPEED_MULTIPLIER
              * self.get_mean_speed()
              + self.CALORIES_MEAN_SPEED_SHIFT)
@@ -95,7 +106,7 @@ class Running(Training):
             * (self.duration * self.MIN_IN_HOUR)
         )
 
-        return spent_calories
+        return self.spent_calories
 
 
 class SportsWalking(Training):
@@ -104,7 +115,7 @@ class SportsWalking(Training):
     CALORIES_WEIGHT_FACTOR_1: float = 0.035
     CALORIES_WEIGHT_FACTOR_2: float = 0.029
     M_TO_SEC_CONVERTER: float = 0.278
-    CM_TO_METERS: int = 100
+    CM_IN_METER: int = 100
 
     def __init__(self,
                  action: int,
@@ -113,24 +124,29 @@ class SportsWalking(Training):
                  height: float) -> None:
         """Инициализирует дополнительный атрибут: height."""
         super().__init__(action, duration, weight)
-        self.height: float = height / self.CM_TO_METERS
+        # Рост сразу переводим в метры.
+        self.height: float = height / self.CM_IN_METER
 
     def get_spent_calories(self) -> float:
         """Расчёт калорий для спортивной ходьбы."""
-        meters_in_sec = self.get_mean_speed() * self.M_TO_SEC_CONVERTER
-        spent_calories = (
-            (self.CALORIES_WEIGHT_FACTOR_1 * self.weight
-             + (meters_in_sec**2 / self.height)
-             * self.CALORIES_WEIGHT_FACTOR_2 * self.weight)
+        meters_in_sec: float = self.get_mean_speed() * self.M_TO_SEC_CONVERTER
+
+        self.spent_calories = (
+            (
+                self.CALORIES_WEIGHT_FACTOR_1 * self.weight
+                + (meters_in_sec ** 2 / self.height)
+                * self.CALORIES_WEIGHT_FACTOR_2 * self.weight
+            )
             * self.duration * self.MIN_IN_HOUR
         )
 
-        return spent_calories
+        return self.spent_calories
 
 
 class Swimming(Training):
     """Тренировка: плавание."""
 
+    # Расстояние, которое спортсмен преодолевает за один гребок.
     LEN_STEP: float = 1.38
     SPEED_SWIM_SHIFT: float = 1.1
     CALORIES_SPEED_SWIM_MULTIPLIER: int = 2
@@ -148,49 +164,80 @@ class Swimming(Training):
 
     def get_mean_speed(self) -> float:
         """Рассчитывает среднюю скорость плавания."""
-        mean_speed_km_h = (
+        self.mean_speed_km_h = (
             self.length_pool
             * self.count_pool
             / self.M_IN_KM
             / self.duration
         )
 
-        return mean_speed_km_h
+        return self.mean_speed_km_h
 
     def get_spent_calories(self) -> float:
         """Расчёт калорий для плавания."""
-        spent_calories = (
-            (self.get_mean_speed()
-             + self.SPEED_SWIM_SHIFT)
+        self.spent_calories = (
+            (
+                self.get_mean_speed()
+                + self.SPEED_SWIM_SHIFT
+            )
             * self.CALORIES_SPEED_SWIM_MULTIPLIER
             * self.weight
             * self.duration
         )
 
-        return spent_calories
+        return self.spent_calories
 
 
-def read_package(workout_tpe: str, data_list: list) -> Training:
+def checking_correct_data(wrk_typ: str, dat_list: list) -> bool:
+    """Проверка списка пакетов данных.
+
+    Для каждой тренировки список проверяется на длину и присутствие None.
+    """
+    correct_list_length = {
+        SWM: LEN_FOR_SWM,
+        RUN: LEN_FOR_RUN,
+        WLK: LEN_FOR_WLK
+    }
+
+    if None in dat_list:
+        return False
+
+    if len(dat_list) != correct_list_length[wrk_typ]:
+        return False
+
+    return True
+
+
+def read_package(workout_tpe: str, data_list: list) -> Any:
     """Прочитать данные полученные от датчиков."""
     training_classes: dict = {
-        'SWM': Swimming,
-        'RUN': Running,
-        'WLK': SportsWalking
+        SWM: Swimming,
+        RUN: Running,
+        WLK: SportsWalking
     }
+
+    if workout_tpe not in training_classes:
+        return NOT_FOUND
+
+    if not checking_correct_data(workout_tpe, data_list):
+        return BAD_DATA
 
     training_cls: Training = training_classes[workout_tpe](*data_list)
 
     return training_cls
 
 
-def main(training_obj: Training) -> None:
+def main(training_obj: Any) -> None:
     """Главная функция."""
-    info: InfoMessage = training_obj.show_training_info()
-    print(info.get_message())
+    if isinstance(training_obj, Training):
+        info: InfoMessage = training_obj.show_training_info()
+        print(info.get_message())
+    else:
+        print(training_obj)
 
 
 if __name__ == '__main__':
-    packages = [
+    packages: list[tuple[str, list]] = [
         ('SWM', [720, 1, 80, 25, 40]),
         ('RUN', [15000, 1, 75]),
         ('WLK', [9000, 1, 75, 180]),
