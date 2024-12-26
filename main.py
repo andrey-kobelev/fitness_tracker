@@ -7,7 +7,7 @@
 """
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Union
 
 SWM: str = 'SWM'
 RUN: str = 'RUN'
@@ -75,9 +75,9 @@ class Training:
 
         return self.mean_speed_km_h
 
-    def get_spent_calories(self) -> Any:
+    def get_spent_calories(self) -> float:
         """Получить количество затраченных калорий."""
-        pass
+        raise NotImplementedError
 
     def show_training_info(self) -> InfoMessage:
         """Вернуть информационное сообщение о выполненной тренировке."""
@@ -208,7 +208,8 @@ def checking_correct_data(wrk_typ: str, dat_list: list) -> bool:
     return True
 
 
-def read_package(workout_tpe: str, data_list: list) -> Any:
+def read_package(workout_tpe: str,
+                 data_list: list[Union[int, float], ...]) -> Any:
     """Прочитать данные полученные от датчиков."""
     training_classes: dict = {
         SWM: Swimming,
@@ -217,10 +218,10 @@ def read_package(workout_tpe: str, data_list: list) -> Any:
     }
 
     if workout_tpe not in training_classes:
-        return NOT_FOUND
+        raise Exception(NOT_FOUND)
 
     if not checking_correct_data(workout_tpe, data_list):
-        return BAD_DATA
+        raise Exception(BAD_DATA)
 
     training_cls: Training = training_classes[workout_tpe](*data_list)
 
